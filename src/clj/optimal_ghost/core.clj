@@ -2,12 +2,14 @@
   (:require
     [optimal-ghost.handler :as handler]
     [optimal-ghost.nrepl :as nrepl]
+    [optimal-ghost.routes.services :as services]
     [luminus.http-server :as http]
     [optimal-ghost.config :refer [env]]
     [clojure.tools.cli :refer [parse-opts]]
     [clojure.tools.logging :as log]
     [mount.core :as mount])
   (:gen-class))
+
 
 ;; log uncaught exceptions in threads
 (Thread/setDefaultUncaughtExceptionHandler
@@ -25,8 +27,9 @@
   :start
   (http/start
     (-> env
-        (assoc  :handler (handler/app))
+        (assoc :handler (handler/app))
         (update :port #(or (-> env :options :port) %))
+        ;(assoc :host "0.0.0.0")
         (select-keys [:handler :host :port :async?])))
   :stop
   (http/stop http-server))
@@ -47,6 +50,7 @@
   (shutdown-agents))
 
 (defn start-app [args]
+  (log/info "Starting optimal-ghost" services/version)
   (doseq [component (-> args
                         (parse-opts cli-options)
                         mount/start-with-args

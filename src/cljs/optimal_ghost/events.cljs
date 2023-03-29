@@ -10,7 +10,8 @@
 
 (def state (r/atom {:word ""
                     :status nil
-                    :letter ""}))
+                    :letter ""
+                    :version ""}))
 
 ;;dispatchers
 
@@ -32,9 +33,7 @@
   :common/navigate-replace-fx!
   (fn [[k & [params query]]]
     (.log js/console "navigate-replace-fx!!" k params query)
-    (rfe/replace-state k  params query)
-    ;(rfe/push-state k params query)
-    ))
+    (rfe/replace-state k  params query)))
 
 (rf/reg-event-fx
   :navigate-replace!
@@ -48,18 +47,6 @@
     (.log js/console "navigate!" url-key params query)
     {:common/navigate-fx! [url-key params query]}))
 
-;(rf/reg-event-db
-;  :set-docs
-;  (fn [db [_ docs]]
-;    (assoc db :docs docs)))
-
-;(rf/reg-event-fx
-;  :fetch-docs
-;  (fn [_ _]
-;    {:http-xhrio {:method          :get
-;                  :uri             "/docs"
-;                  :response-format (ajax/raw-response-format)
-;                  :on-success       [:set-docs]}}))
 
 (rf/reg-event-db
   :common/set-error
@@ -68,35 +55,29 @@
 
 (rf/reg-event-fx
   :page/init-home
-  (fn [_ _])
-  ;(fn [_ _]
-  ;  {:dispatch [:fetch-docs]})
-  )
+  (fn [_ _]))
 
 
 (rf/reg-event-fx
   :submit-word-success
-  (fn [_cofx  [_ letter {:keys [status move] :as result}]]
+  (fn [_cofx  [_ letter {:keys [status move] :as _result}]]
     (swap! state update :word #(str % letter move))
     (swap! state assoc :status status)
 
     (cond
-      (= status "computer-completes-word")
+      (#{"computer-completes-word" "computer-unable-to-move"} status)
       (rf/dispatch [:navigate-replace! :won])
 
-      (#{"opponent-completes-word" "opponent-invalid-word"} status)
-      (rf/dispatch [:navigate-replace! :lost]))
+      (#{"opponent-completes-word" "opponent-invalid-word" "opponent-unable-to-move"}  status)
+      (rf/dispatch [:navigate-replace! :lost])
 
-    ;(.log js/console "Submit word success" status move)
-    ; (.log js/console "Submit word success" (type status))
-    ;(.log js/console "Word" (-> state deref :word ))
-  ))
+      :else
+      (-> js/document (.getElementById "submit-letter") .focus))))
 
 (rf/reg-event-fx
   :submit-word-failure
   (fn [cofx _]
-    (js/alert "Submit word failure")
-    ))
+    (js/alert "Submit word failure")))
 
 (rf/reg-event-fx
   :submit-word
@@ -115,6 +96,28 @@
                     :on-failure      [:submit-word-failure]}})))
 
 
+(rf/reg-event-fx
+  :submit-version-success
+  (fn [_cofx  [_  {:keys [version] :as _result}]]
+    (swap! state assoc :version version)))
+
+(rf/reg-event-fx
+  :submit-version-failure
+  (fn [cofx _]
+    (js/alert "Submit version failure")))
+
+
+(rf/reg-event-fx
+  :submit-version
+  (fn [_cofx [_]]
+    {:http-xhrio {:uri             (str "/api/get-version")
+                  :method          :get
+                  :timeout         10000
+                  :format          (ajax/json-request-format)
+                  :request-format  (ajax/json-request-format)
+                  :response-format (ajax/json-response-format {:keywords? true})
+                  :on-success      [:submit-version-success]
+                  :on-failure      [:submit-version-failure]}}))
 
 ;;subscriptions
 
