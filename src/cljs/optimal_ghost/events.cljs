@@ -1,91 +1,89 @@
 (ns optimal-ghost.events
   (:require
+    [ajax.core :as ajax]
     [day8.re-frame.http-fx]
     [re-frame.core :as rf]
-    [ajax.core :as ajax]
-    [reagent.core :as r]
     [reitit.frontend.easy :as rfe]
     [reitit.frontend.controllers :as rfc]))
 
+;;;; Constants
 
-(def state (r/atom {:word ""
-                    :status nil
-                    :letter ""
-                    :version ""}))
+(def ^:private network-error
+  "Unable to connect to the server. Please check your internet connection. Automatically retrying in 15 secs...")
 
-;;dispatchers
+(def ^:private server-retry-timeout 15000)
+
+
+;;;; Helper
+(defn get-winner
+  [status]
+  (cond
+    (#{"computer-completes-word" "computer-unable-to-move"} status)
+    :human
+
+    (#{"opponent-completes-word" "opponent-invalid-word" "opponent-unable-to-move"} status)
+    :computer
+
+    (= status "in-progress")
+    :in-progress
+
+    :else
+    :unknown))
+
+
+;;;; Dispatchers
 
 (rf/reg-event-db
-  :common/navigate
+  :navigate
   (fn [db [_ match]]
-    (let [old-match (:common/route db)
+    (let [old-match (:route db)
           new-match (assoc match :controllers
                                  (rfc/apply-controllers (:controllers old-match) match))]
-      (assoc db :common/route new-match))))
+      (assoc db :route new-match))))
 
 (rf/reg-fx
-  :common/navigate-fx!
+  :navigate-replace-fx!
   (fn [[k & [params query]]]
-    (.log js/console "navigate-fx!!" k params query)
-    (rfe/push-state k params query)))
-
-(rf/reg-fx
-  :common/navigate-replace-fx!
-  (fn [[k & [params query]]]
-    (.log js/console "navigate-replace-fx!!" k params query)
     (rfe/replace-state k  params query)))
 
 (rf/reg-event-fx
   :navigate-replace!
   (fn [_ [_ url-key params query]]
-    (.log js/console ":navigate-replace!" url-key params query)
-    {:common/navigate-replace-fx! [url-key params query]}))
+    {:navigate-replace-fx! [url-key params query]}))
 
 (rf/reg-event-fx
-  :common/navigate!
-  (fn [_ [_ url-key params query]]
-    (.log js/console "navigate!" url-key params query)
-    {:common/navigate-fx! [url-key params query]}))
-
-
-(rf/reg-event-db
-  :common/set-error
-  (fn [db [_ error]]
-    (assoc db :common/error error)))
-
-(rf/reg-event-fx
-  :page/init-home
-  (fn [_ _]))
-
+  :set-focus-submit-letter
+  (fn [_ _ ]
+    (js/setTimeout #(-> js/document (.getElementById "submit-letter") .focus) 100)
+    {}))
 
 (rf/reg-event-fx
   :submit-word-success
-  (fn [_cofx  [_ letter {:keys [status move] :as _result}]]
-    (swap! state update :word #(str % letter move))
-    (swap! state assoc :status status)
-
-    (cond
-      (#{"computer-completes-word" "computer-unable-to-move"} status)
-      (rf/dispatch [:navigate-replace! :won])
-
-      (#{"opponent-completes-word" "opponent-invalid-word" "opponent-unable-to-move"}  status)
-      (rf/dispatch [:navigate-replace! :lost])
-
-      :else
-      (-> js/document (.getElementById "submit-letter") .focus))))
+  (fn [{:keys [db]}  [_ letter {:keys [status move] :as _result}]]
+    (rf/dispatch
+      (if (= :in-progress (get-winner status))
+        [:set-focus-submit-letter]
+        [:navigate-replace! :game-over]))
+    {:db
+     (-> db
+         (assoc :letter ""
+                :letter-submitted false
+                :error nil
+                :status status)
+         (update :word #(str % letter move)))}))
 
 (rf/reg-event-fx
   :submit-word-failure
-  (fn [cofx _]
-    (js/alert "Submit word failure")))
+  (fn [{:keys [db]} _]
+    (js/setTimeout #(rf/dispatch [:submit-word]) server-retry-timeout)
+    {:db (assoc db :error network-error)}))
 
 (rf/reg-event-fx
   :submit-word
-  (fn [_cofx [_]]
-    (let [letter      (-> state deref :letter)
-          body-params {:word (str (-> state deref :word) letter)}]
-      (swap! state assoc :letter "")
-      {:http-xhrio {:uri       (str "/api/get-move")
+  (fn [{:keys [db]} [_]]
+    (let [letter      (:letter db)
+          body-params {:word (str (:word db) letter)}]
+      {:http-xhrio {:uri             (str "/api/get-move")
                     :method          :post
                     :timeout         10000
                     :params          body-params
@@ -93,18 +91,20 @@
                     :request-format  (ajax/json-request-format)
                     :response-format (ajax/json-response-format {:keywords? true})
                     :on-success      [:submit-word-success letter]
-                    :on-failure      [:submit-word-failure]}})))
+                    :on-failure      [:submit-word-failure]}
 
+       :db (assoc db :letter-submitted true)})))
 
 (rf/reg-event-fx
   :submit-version-success
-  (fn [_cofx  [_  {:keys [version] :as _result}]]
-    (swap! state assoc :version version)))
-
+  (fn [{:keys [db]} [_ {:keys [version] :as _result}]]
+    {:db (assoc db :version version
+                   :error nil)}))
 (rf/reg-event-fx
   :submit-version-failure
-  (fn [cofx _]
-    (js/alert "Submit version failure")))
+  (fn [{:keys [db]} _]
+    (js/setTimeout #(rf/dispatch [:submit-version]) server-retry-timeout)
+    {:db (assoc db :error network-error)}))
 
 
 (rf/reg-event-fx
@@ -119,31 +119,73 @@
                   :on-success      [:submit-version-success]
                   :on-failure      [:submit-version-failure]}}))
 
-;;subscriptions
-
-(rf/reg-sub
-  :common/route
+(rf/reg-event-db
+  :initialise
   (fn [db _]
-    (-> db :common/route)))
+    (rf/dispatch [:submit-version])
+    (assoc db :initialised? true
+              :word ""
+              :letter ""
+              :status nil
+              :version ""
+              :letter-submitted false
+              :error nil)))
+
+(rf/reg-event-db
+  :letter
+  (fn [db [_ letter]]
+    (assoc db :letter letter)))
+
+(rf/reg-event-db
+  :clear-word
+  (fn [db _]
+    (assoc db :word "")))
+
+
+;;;; Subscriptions
 
 (rf/reg-sub
-  :common/page-id
-  :<- [:common/route]
-  (fn [route _]
-    (-> route :data :name)))
+  :initialised?
+  (fn [db _]
+    (-> db :initialised?)))
 
 (rf/reg-sub
-  :common/page
-  :<- [:common/route]
+  :version
+  (fn [db _]
+    (:version db)))
+
+(rf/reg-sub
+  :error
+  (fn [db _]
+    (:error db)))
+
+(rf/reg-sub
+  :word
+  (fn [db _]
+    (:word db)))
+
+(rf/reg-sub
+  :letter
+  (fn [db _]
+    (:letter db)))
+
+(rf/reg-sub
+  :letter-submitted
+  (fn [db _]
+    (:letter-submitted db)))
+
+(rf/reg-sub
+  :status
+  (fn [db _]
+    (:status db)))
+
+(rf/reg-sub
+  :route
+  (fn [db _]
+    (:route db)))
+
+(rf/reg-sub
+  :page
+  :<- [:route]
   (fn [route _]
     (-> route :data :view)))
-
-(rf/reg-sub
-  :docs
-  (fn [db _]
-    (:docs db)))
-
-(rf/reg-sub
-  :common/error
-  (fn [db _]
-    (:common/error db)))

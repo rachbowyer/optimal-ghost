@@ -109,7 +109,8 @@
         :else
         [:in-progress move]))
 
-    (not (children f))
+    (or (nil? children)
+        (nil? (children f)))
     [:opponent-invalid-word (char 0)]
 
     :else
