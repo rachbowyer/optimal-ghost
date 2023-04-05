@@ -5,6 +5,7 @@
 
   :dependencies [[ch.qos.logback/logback-classic "1.4.4"]
                  [cljs-ajax "0.8.4"]
+                 [org.clojure/data.generators "1.0.0"]
                  [clojure.java-time "1.1.0"]
                  [com.cognitect/transit-clj "1.0.329"]
                  [com.cognitect/transit-cljs "0.8.280"]
@@ -44,7 +45,7 @@
   
   :source-paths ["src/clj" "src/cljs" "src/cljc"]
   :test-paths ["test/clj"]
-  :resource-paths ["resources" "target/cljsbuild"]
+  :resource-paths ["resources" "test-resources" "target/cljsbuild"]
   :target-path "target/%s/"
   :main ^:skip-aot optimal-ghost.core
 

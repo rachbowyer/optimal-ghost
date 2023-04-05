@@ -39,6 +39,6 @@
        (cond-> {:type     :button
                 :on-click game-page-on-click
                 :class    styles/button-style}
-               letter-submitted
+               (or letter-submitted (str/blank? letter))
                (assoc :disabled "disabled"))
        "Submit"]]]))

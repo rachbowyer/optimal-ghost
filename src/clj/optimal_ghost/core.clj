@@ -29,7 +29,6 @@
     (-> env
         (assoc :handler (handler/app))
         (update :port #(or (-> env :options :port) %))
-        ;(assoc :host "0.0.0.0")
         (select-keys [:handler :host :port :async?])))
   :stop
   (http/stop http-server))

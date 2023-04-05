@@ -1,5 +1,6 @@
 (ns optimal-ghost.engine
   (:require
+    [clojure.data.generators :as gen]
     [clojure.java.io :as io]
     [clojure.string :as str]
     [mount.core :as mount]
@@ -28,7 +29,7 @@
    :path-length - the number of letters in the path from the root to this node
    :word? - true if this node completes a word
    :status - :winning if the player can force a win, :losing if the player cannot
-             force a win, :completes-word if a word of 4 or more letters has bee
+             force a win, :completes-word if a word of 4 or more letters has been
              completed and :unable-to-move if the player cannot move
    :best-moves - the best moves to take from this position
                  if winning any moves that force a win
@@ -63,13 +64,13 @@
       (comp (partial * -1) :distance-to-resolution val)
 
       best-moves
-      (if (= status :winning)
-        (keys winning-moves)
-        (->> losing-moves
-             (sort-by get-dist-to-res)
-             (partition-by get-dist-to-res)
-             first
-             (map key)))
+      (set (if (= status :winning)
+             (keys winning-moves)
+             (->> losing-moves
+                  (sort-by get-dist-to-res)
+                  (partition-by get-dist-to-res)
+                  first
+                  (map key))))
 
       distance-to-resolution
       (cond
@@ -97,7 +98,7 @@
     [:opponent-unable-to-move (char 0)]
 
     (nil? f)
-    (let [move    (rand-nth best-moves)
+    (let [move    (-> best-moves seq gen/rand-nth)
           status  (-> move children :status)]
       (cond
         (= status :completes-word)
@@ -116,13 +117,6 @@
     :else
     (recur (children f) r)))
 
-
-(defn get-status [{:keys [status children]} [f & r :as _word]]
-  (if (nil? f)
-    status
-    (if (not (children f))
-      :invalid-word
-      (recur (children f) r))))
 
 (mount/defstate dict
   :start (->> (load-words)
