@@ -1,16 +1,22 @@
 # optimal-ghost
 
-generated using Luminus version "4.47"
+My implementation of ITA' optimal-ghost game.
 
-FIXME
 
-## Prerequisites
+## To run it in a REPL
 
-You will need [Leiningen][1] 2.0 or above installed.
+Needs leiningen, shadow-cljs and tailwind
 
-[1]: https://github.com/technomancy/leiningen
+Then
 
-## Running
+    npx tailwindcss -i ./resources/css/input.css -o ./resources/public/css/output.css --watch
+
+to run tailwind in watch mode
+
+    shadow-cljs watch app
+
+to run shadow-cljs in watch mode
+
 
 To start a web server for the application, run:
 
@@ -22,20 +28,33 @@ In the REPL, run:
     (start)
 
 
-To build the js
-    shadow-cljs watch app
+## To build the app and run it
 
+    lein clean
+    shadow-cljs compile app
+    npx tailwindcss -i ./resources/css/input.css -o ./resources/public/css/output.css
+    lein uberjar
+    java -jar target/default+uberjar/optimal-ghost.jar
+
+
+## To run the tests
+
+    lein test
+
+
+## The URLs
 
 To access the API
 http://localhost:3000/api/api-docs/index.html#/
 
 To access the app
-
 http://localhost:3000/
 
 
+Or to access a prebuilt version of the app
+http://optimal-ghost.bowyer.info/
 
 
-## License
+## Copyright Information
 
-Copyright © 2023 FIXME
+Copyright © 2023
