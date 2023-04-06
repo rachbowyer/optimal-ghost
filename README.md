@@ -1,6 +1,7 @@
 # optimal-ghost
 
-My implementation of ITA's Optimal Ghost.
+My implementation of ITA's Optimal Ghost. To read me about it please click
+[here](https://www.bowyer.info/ita-optimal-ghost).
 
 
 ## To run it in a REPL
