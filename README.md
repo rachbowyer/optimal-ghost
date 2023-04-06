@@ -1,6 +1,6 @@
 # optimal-ghost
 
-My implementation of ITA' optimal-ghost game.
+My implementation of ITA's Optimal Ghost.
 
 
 ## To run it in a REPL
