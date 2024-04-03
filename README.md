@@ -52,9 +52,6 @@ To access the app
 http://localhost:3000/
 
 
-Or to access a prebuilt version of the app
-http://optimal-ghost.bowyer.info/
-
 
 ## Copyright Information
 
